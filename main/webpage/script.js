@@ -93,6 +93,9 @@ function handleFileSelect(evt) {
                 resulting_img = canvas_context.getImageData(0, 0, dest_width, dest_height);
                 const pixels = resulting_img.data;
 
+                // Reset array
+                output_array.fill(0);
+
                 let output_array_idx = 0;
                 let output_array_sub = 0;
 
@@ -121,18 +124,18 @@ function handleFileSelect(evt) {
                                 newpixel_r  = 255;
                                 newpixel_gb = 0;
                                 // Store the nibbles
-                                output_array[output_array_idx + half_of_array] |= 0x1 << output_array_sub;
+                                output_array[output_array_idx + half_of_array] |= 0x1 << (7 - output_array_sub);
                             }
                             else
                             {
-                                output_array[output_array_idx] |= (newpixel_gb >> 7) << output_array_sub;
+                                output_array[output_array_idx] |= (newpixel_gb & 0x1) << (7 - output_array_sub);
                             }
                         }
                         // Black & white
                         else
                         {
                             newpixel_gb = newpixel_r;
-                            output_array[output_array_idx] |= (newpixel_gb >> 7) << output_array_sub;
+                            output_array[output_array_idx] |= (newpixel_gb & 0x1) << (7 - output_array_sub);
                         }
 
                         // Increment sub-iterator and iterator

@@ -32,6 +32,7 @@ extern const char script_end[] asm("_binary_script_js_end");
 extern const char style_start[] asm("_binary_style_css_start");
 extern const char style_end[] asm("_binary_style_css_end");
 
+
 static esp_err_t common_get_handler(httpd_req_t *req);
 static esp_err_t buffer_post_handler(httpd_req_t *req);
 static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
@@ -52,7 +53,8 @@ static const httpd_uri_t buffer_post_uri = {
     .user_ctx  = NULL
 };
 
-static const char *TAG = "PaperFrame";
+static const char *TAG                      = "PaperFrame";
+static bool display_buffer_delayed_store    = false;
 
 static void wifi_event_handler(void *arg, esp_event_base_t event_base,
                                int32_t event_id, void *event_data)
@@ -169,14 +171,7 @@ static esp_err_t buffer_post_handler(httpd_req_t *req)
     // End response
     httpd_resp_send_chunk(req, NULL, 0);
 
-    if(display_save_framebuffer())
-    {
-        ESP_LOGI(TAG, "Received and saved %lu bytes", idx);
-    }
-    else
-    {
-        ESP_LOGI(TAG, "Failed to store framebuffer");
-    }
+    display_buffer_delayed_store = true;
 
     return ESP_OK;
 }
@@ -231,4 +226,23 @@ void app_main(void)
 
     // Start the DNS server that will redirect all queries to the softAP IP
     start_dns_server();
+
+    while (1)
+    {
+        if (display_buffer_delayed_store)
+        {
+            if(display_save_framebuffer())
+            {
+                ESP_LOGI(TAG, "Framebuffer saved");
+            }
+            else
+            {
+                ESP_LOGI(TAG, "Failed to store framebuffer");
+            }
+
+            display_buffer_delayed_store = false;
+        }
+
+        vTaskDelay(1);
+    }
 }

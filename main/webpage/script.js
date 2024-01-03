@@ -8,8 +8,10 @@ const canvas_context = canvas.getContext("2d", {willReadFrequently: true});
 const img_preview     = document.querySelector("#img_original");
 const data_upload_msg = document.querySelector("#data_upload_msg");
 
-// The output array will encode colors on two bits: 0x0 for black, 0x1 for white, 0x2 for red
-var output_array = new Uint8ClampedArray((dest_height*dest_width)/4);
+// The output array is divided in two parts: first half for black/white and second half for red/none
+// Bits set to 1 means white/red, bits to 0 are for black/none
+var output_array    = new Uint8ClampedArray((dest_height*dest_width)/4);
+const half_of_array = (dest_height*dest_width)/8;
 
 function handleFileSelect(evt) {
     var file = document.querySelector("#img_upload").files[0];
@@ -100,7 +102,7 @@ function handleFileSelect(evt) {
                         // Get the pixel index
                         let i = y*dest_width*4 + x*4;
 
-                        pixels[i+3] = 0xFF; // Set alpha to max
+                        pixels[i+3] = 255; // Set alpha to max
 
                         // Compute colors ratio
                         const gb = Math.sqrt(Math.pow(pixels[i + 1], 2) + Math.pow(pixels[i + 2],2));
@@ -110,21 +112,31 @@ function handleFileSelect(evt) {
                         let newpixel_gb = (gb > 128) ? 255 : 0;
                         let newpixel_r  = (rgb > 128) ? 255 : 0;
 
-                        // If red is major, set it full blast and no black channel
-                        if ((pixels[i] >= 128) && (gb < 128))
+                        // Full color palette
+                        if (document.querySelector('input[name="color"]:checked').value == "1")
                         {
-                            newpixel_r  = 0xFF;
-                            newpixel_gb = 0;
-                            // Store the nibbles
-                            output_array[output_array_idx] |= 0x2 << output_array_sub;
+                            // If red is major, set it full blast and no black channel
+                            if ((pixels[i] >= 128) && (gb < 128))
+                            {
+                                newpixel_r  = 255;
+                                newpixel_gb = 0;
+                                // Store the nibbles
+                                output_array[output_array_idx + half_of_array] |= 0x1 << output_array_sub;
+                            }
+                            else
+                            {
+                                output_array[output_array_idx] |= (newpixel_gb >> 7) << output_array_sub;
+                            }
                         }
+                        // Black & white
                         else
                         {
+                            newpixel_gb = newpixel_r;
                             output_array[output_array_idx] |= (newpixel_gb >> 7) << output_array_sub;
                         }
 
                         // Increment sub-iterator and iterator
-                        output_array_sub = (output_array_sub+2) % 8;
+                        output_array_sub = (output_array_sub+1) % 8;
                         output_array_idx = (output_array_sub == 0) ? (output_array_idx+1) : output_array_idx;
 
                         // Set pixels
@@ -181,7 +193,7 @@ function handleFileSelect(evt) {
                 req.open("POST", "/upload", true);
 
                 req.onload = (event) => {
-                    data_upload_msg.innerHTML = "Upload succeeded";
+                    data_upload_msg.innerHTML = "UPLOAD SUCCEEDED";
                 };
 
                 req.send(output_array);

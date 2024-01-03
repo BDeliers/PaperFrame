@@ -2,24 +2,47 @@
 <html lang="en">
     <head>
         <title>PhotoFrame</title>
-        <meta charset="utf-8">
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-        <link rel="stylesheet" href="style.css">
+        <link rel="stylesheet" href="style.css" />
     </head>
     
     <body>
         
         <header>
+            <h1>PAPER FRAME</h1>
+            <p>PICTURE UPLOAD</p>
         </header>
         
         <main>
-            <input type="file" id="img_upload" accept="image/png,image/jpeg,image/bmp" />
-            <img id="img_original" class="preview" />
-            <canvas id="img_result" class="preview" ></canvas>
+            <div id="div_radio">
+                <label>
+                    BLACK WHITE RED
+                    <br/>
+                    <input type="radio" name="color" value="1" checked />
+                </label>
+                <label>
+                    BLACK & WHITE
+                    <br/>
+                    <input type="radio" name="color" value="0" />
+                </label>
+            </div>
+            <label id="img_upload_wrapper" class="border" >
+                UPLOAD IMAGE
+                <input type="file" id="img_upload" accept="image/png,image/jpeg,image/bmp" />
+            </label>
             <h2 id="data_upload_msg"></h2>
+            <div id="div_images">
+                <img id="img_original" class="preview border" />
+                <canvas id="img_result" class="preview border" ></canvas>
+            </div>
         </main>
         
         <footer>
+            <h3>
+                - &copy; BDELIERS 2023 -
+            </h3>
         </footer>
         
     </body>

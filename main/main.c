@@ -53,8 +53,8 @@ static const httpd_uri_t buffer_post_uri = {
     .user_ctx  = NULL
 };
 
-static const char *TAG                      = "PaperFrame";
-static bool display_buffer_delayed_store    = false;
+static const char*  TAG                         = "main";
+static bool         image_received              = false;
 
 static void wifi_event_handler(void *arg, esp_event_base_t event_base,
                                int32_t event_id, void *event_data)
@@ -143,8 +143,8 @@ static esp_err_t buffer_post_handler(httpd_req_t *req)
     int ret            = ESP_FAIL;
     int remaining      = req->content_len;
     uint32_t idx       = 0;
-    uint8_t* buff      = display_get_framebuffer();
-    uint32_t buff_size = display_get_framebuffer_size();
+    uint8_t* buff      = display_manager_get_framebuffer();
+    uint32_t buff_size = display_manager_get_framebuffer_size();
 
     if (remaining > buff_size)
     {
@@ -171,7 +171,7 @@ static esp_err_t buffer_post_handler(httpd_req_t *req)
     // End response
     httpd_resp_send_chunk(req, NULL, 0);
 
-    display_buffer_delayed_store = true;
+    image_received = true;
 
     return ESP_OK;
 }
@@ -227,20 +227,33 @@ void app_main(void)
     // Start the DNS server that will redirect all queries to the softAP IP
     start_dns_server();
 
+    // Just initialize the display driver
+    if (!display_manager_init())
+    {
+        ESP_LOGE(TAG, "Failed to initialize display");
+    }
+
+    ESP_LOGI(TAG, "Starting main loop");
+
     while (1)
     {
-        if (display_buffer_delayed_store)
+        if (image_received)
         {
-            if(display_save_framebuffer())
+            if(display_manager_save_framebuffer())
             {
                 ESP_LOGI(TAG, "Framebuffer saved");
             }
             else
             {
-                ESP_LOGI(TAG, "Failed to store framebuffer");
+                ESP_LOGW(TAG, "Failed to store framebuffer");
             }
 
-            display_buffer_delayed_store = false;
+            if (!display_manager_transfer_and_sleep())
+            {
+                ESP_LOGE(TAG, "Failed to set display");
+            }
+
+            image_received = false;
         }
 
         vTaskDelay(1);

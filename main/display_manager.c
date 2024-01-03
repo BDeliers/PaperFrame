@@ -1,29 +1,42 @@
+#include <string.h>
+
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+
 #include "esp_system.h"
-#include "nvs_flash.h"
+#include "esp_log.h"
 #include "nvs.h"
+#include "nvs_flash.h"
 
+#include "display_config.h"
 #include "display_manager.h"
-
-#define DISPLAY_HEIGHT          480U
-#define DISPLAY_WIDTH           800U
-#define BUFFER_SIZE             (DISPLAY_WIDTH*DISPLAY_HEIGHT)/4U
+#include "display_driver.h"
 
 #define STORAGE_NAMESPACE       "storage"
 
-// We'll use 2 bits per pixel, black=0, white=1, red=2
-static uint8_t framebuffer[BUFFER_SIZE] = {0};
+// First half of the buffer is for white/black info, second half is for red/none
+static uint8_t framebuffer[FRAMEBUFFER_SIZE] = {0};
 
-uint8_t* display_get_framebuffer(void)
+static const char *TAG                  = "display_manager";
+
+uint8_t* display_manager_get_framebuffer(void)
 {
     return framebuffer;
 }
 
-uint32_t display_get_framebuffer_size(void)
+uint32_t display_manager_get_framebuffer_size(void)
 {
-    return BUFFER_SIZE;
+    return FRAMEBUFFER_SIZE;
 }
 
-bool display_save_framebuffer(void)
+void display_manager_clear_framebuffer(void)
+{
+    // Set framebuffer to full white
+    memset(framebuffer, 0xFF, FRAMEBUFFER_SIZE/2);
+    memset(framebuffer + FRAMEBUFFER_SIZE/2, 0x0, FRAMEBUFFER_SIZE/2);
+}
+
+bool display_manager_save_framebuffer(void)
 {
     nvs_handle_t my_handle;
     esp_err_t err;
@@ -61,7 +74,7 @@ bool display_save_framebuffer(void)
     return true;
 }
 
-bool display_restore_framebuffer(void)
+bool display_manager_restore_framebuffer(void)
 {
     nvs_handle_t my_handle;
     esp_err_t err;
@@ -78,7 +91,7 @@ bool display_restore_framebuffer(void)
     err = nvs_get_blob(my_handle, "framebuffer", NULL, &required_size);
 
     // Fail if corrupted data or not set yet
-    if (((err != ESP_OK) && (err != ESP_ERR_NVS_NOT_FOUND)) || (required_size != BUFFER_SIZE)) 
+    if (((err != ESP_OK) && (err != ESP_ERR_NVS_NOT_FOUND)) || (required_size != FRAMEBUFFER_SIZE)) 
     {
         return false;
     }
@@ -98,4 +111,20 @@ bool display_restore_framebuffer(void)
     // Close
     nvs_close(my_handle);
     return true;
+}
+
+bool display_manager_init(void)
+{
+    return display_driver_init(framebuffer);
+}
+
+bool display_manager_transfer_and_sleep(void)
+{
+    uint8_t ret = 0;
+    ret += display_configure();
+    ret += display_transfer();
+    ret += display_refresh();
+    ret += display_low_power_mode();
+
+    return ret == 4;
 }

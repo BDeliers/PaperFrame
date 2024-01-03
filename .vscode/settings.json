@@ -4,5 +4,5 @@
         "board/esp32-bridge.cfg"
     ],
     "idf.flashType": "UART",
-    "cmake.configureOnOpen": false
+    "cmake.configureOnOpen": false,
 }

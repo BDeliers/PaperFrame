@@ -19,15 +19,15 @@ function handleFileSelect(evt) {
 
             img.onload = function() {
                 // Draw the original image into a clean canvas
-                canvas_context.reset();
                 canvas_context.clearRect(0, 0, canvas.width, canvas.height);         
-                canvas_context.drawImage(img, 0, 0);
-
-                // Show the original image preview
-                img_preview.src = canvas.toDataURL();
 
                 canvas.height = img.height;
                 canvas.width = img.width;
+
+                canvas_context.drawImage(img, 0, 0);
+                
+                // Show the original image preview
+                img_preview.src = canvas.toDataURL();
 
                 let dx = 0;
                 let dy = 0;
@@ -75,7 +75,7 @@ function handleFileSelect(evt) {
                 tmp_canvas_context.putImageData(resulting_img, 0, 0);
 
                 // Now scale image to target sizes
-                canvas_context.reset();
+                canvas_context.resetTransform();
                 canvas.height = dest_height;
                 canvas.width = dest_width;
                 
@@ -170,7 +170,6 @@ function handleFileSelect(evt) {
                 }
                 
                 // Clear canvas and set its contents to the quantized pixels
-                canvas_context.reset();
                 canvas_context.clearRect(0, 0, canvas.width, canvas.height);
                 canvas_context.putImageData(resulting_img, 0, 0);
             };

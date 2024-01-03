@@ -1,0 +1,30 @@
+{
+	"name": "ESP-IDF",
+	"build": {
+		"dockerfile": "Dockerfile"
+	},
+	// Pre-configure ESP-IDF extension
+    "customizations": {
+        "vscode": {
+            "settings": {
+                "idf.showOnboardingOnInit": false,
+                "idf.toolsPath": "/opt/esp",
+                "idf.espIdfPath": "/opt/esp/idf",
+                "idf.pythonBinPath": "/opt/esp/python_env/idf5.1_py3.8_env/bin/python",
+                "idf.port": "/dev/ttyACM0",
+                "terminal.integrated.shell.linux": "/bin/bash"
+            },
+            // Install relevant extensions in the dev container
+            "extensions": [
+                "espressif.esp-idf-extension",
+                "ms-vscode.cmake-tools",
+                "ms-vscode.cpptools"
+            ]
+        }
+    },
+	"userEnvProbe": "loginInteractiveShell",
+	// Forward serial device to enable flash & monitor
+	"runArgs": [
+		"--device=/dev/ttyACM0"
+	]
+}

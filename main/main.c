@@ -22,11 +22,6 @@
 
 #include "display_manager.h"
 
-// WiFi settings from the SDK config
-#define EXAMPLE_ESP_WIFI_SSID CONFIG_ESP_WIFI_SSID
-#define EXAMPLE_ESP_WIFI_PASS CONFIG_ESP_WIFI_PASSWORD
-#define EXAMPLE_MAX_STA_CONN  CONFIG_ESP_MAX_STA_CONN
-
 // index.html, script.js and style.css binary sources
 extern const char html_start[] asm("_binary_index_html_start");
 extern const char html_end[] asm("_binary_index_html_end");
@@ -61,8 +56,10 @@ static const httpd_uri_t buffer_post_uri = {
     .user_ctx  = NULL
 };
 
-static const char*  TAG                         = "main";
-static bool         image_received              = false;
+static const char*          TAG                         = "main";
+static const char*          WIFI_SSID                   = "PaperFrame";
+static bool                 image_received              = false;
+static volatile  uint32_t   timeout_start               = 0;        // Startup time, used to make a timeout
 
 // Handler for WiFi events 
 static void wifi_event_handler(void *arg, esp_event_base_t event_base,
@@ -72,11 +69,17 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
     {
         wifi_event_ap_staconnected_t *event = (wifi_event_ap_staconnected_t *)event_data;
         ESP_LOGI(TAG, "station " MACSTR " join, AID=%d", MAC2STR(event->mac), event->aid);
+
+        // Reset power-down timeout to give the user two minutes
+        timeout_start = xTaskGetTickCount();
     } 
     else if (event_id == WIFI_EVENT_AP_STADISCONNECTED)
     {
         wifi_event_ap_stadisconnected_t *event = (wifi_event_ap_stadisconnected_t *)event_data;
         ESP_LOGI(TAG, "station " MACSTR " leave, AID=%d", MAC2STR(event->mac), event->aid);
+
+        // Stop the system when the user disconnects
+        goto_power_saving();
     }
 }
 
@@ -89,19 +92,15 @@ static void wifi_init_softap(void)
 
     ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL));
 
+    // Make the AP config
     wifi_config_t wifi_config = {
         .ap = {
-            .ssid = EXAMPLE_ESP_WIFI_SSID,
-            .ssid_len = strlen(EXAMPLE_ESP_WIFI_SSID),
-            .password = EXAMPLE_ESP_WIFI_PASS,
-            .max_connection = EXAMPLE_MAX_STA_CONN,
-            .authmode = WIFI_AUTH_WPA_WPA2_PSK
+            .ssid_len       = strlen(WIFI_SSID),
+            .max_connection = 1,
+            .authmode       = WIFI_AUTH_OPEN
         },
     };
-    if (strlen(EXAMPLE_ESP_WIFI_PASS) == 0)
-    {
-        wifi_config.ap.authmode = WIFI_AUTH_OPEN;
-    }
+    strcpy((char*) &wifi_config.ap.ssid, WIFI_SSID);
 
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));
     ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_AP, &wifi_config));
@@ -116,7 +115,7 @@ static void wifi_init_softap(void)
     inet_ntoa_r(ip_info.ip.addr, ip_addr, 16);
     ESP_LOGI(TAG, "Set up softAP with IP: %s", ip_addr);
 
-    ESP_LOGI(TAG, "wifi_init_softap finished. SSID:'%s' password:'%s'", EXAMPLE_ESP_WIFI_SSID, EXAMPLE_ESP_WIFI_PASS);
+    ESP_LOGI(TAG, "wifi_init_softap finished. SSID:'%s', no password", WIFI_SSID);
 }
 
 // HTTP GET Handler for allpages to redirect to index.html
@@ -275,8 +274,8 @@ void app_main(void)
         ESP_LOGE(TAG, "Failed to initialize display");
     }
 
-    uint32_t start_time       = xTaskGetTickCount();    // Startup time, used to make a timeout
     uint32_t timeout_in_ticks = 120*configTICK_RATE_HZ;  // One minute in terms of ticks
+    timeout_start = xTaskGetTickCount();
 
     ESP_LOGI(TAG, "Starting main loop");
 
@@ -303,12 +302,12 @@ void app_main(void)
 
             image_received = false;
 
-            // Send the device and the display
-            goto_power_saving();
+            // Send the device and the display to deep sleep
+            //goto_power_saving();
         }
 
         // Timeout expired
-        if ((xTaskGetTickCount() - start_time) >= timeout_in_ticks)
+        if ((xTaskGetTickCount() - timeout_start) >= timeout_in_ticks)
         {
             goto_power_saving();
         }

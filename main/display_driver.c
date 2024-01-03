@@ -82,8 +82,6 @@ static void display_wait_until_ready(void);
 // Write a command to the display.
 static bool spi_write_command(uint8_t command, bool keep_cs_active)
 {
-    CONFIG_CHECK();
-
     // Get bus ownership
     spi_device_acquire_bus(spi_dev, portMAX_DELAY);
 
@@ -112,8 +110,6 @@ static bool spi_write_command(uint8_t command, bool keep_cs_active)
 // Write data to the display/ Has to be called after spi_write_command
 static bool spi_write_data(uint8_t* data, uint16_t len)
 {
-    CONFIG_CHECK();
-
     if (!transaction_started)
     {
         return false;
@@ -137,8 +133,6 @@ static bool spi_write_data(uint8_t* data, uint16_t len)
 // Read data from the display/ Has to be called after spi_write_command
 static bool spi_read_data(uint8_t* data, uint16_t len)
 {
-    CONFIG_CHECK();
-
     if (!transaction_started)
     {
         return false;
@@ -312,10 +306,12 @@ bool display_configure(void)
     uint8_t buff[7] = {0};
     if (!spi_write_command(GD7965_REG_REV, true) || !spi_read_data(buff, 7))
     {
+        ESP_LOGE(TAG, "Can't write to display");
         return false;
     }
     if (buff[6] != GD7965_REVISION)
     {
+        ESP_LOGE(TAG, "Display revision invalid");
         return false;
     }
 

@@ -5,7 +5,8 @@ const ratio       = dest_width / dest_height;
 const canvas = document.querySelector("#img_result");
 const canvas_context = canvas.getContext("2d", {willReadFrequently: true});
 
-const img_preview = document.querySelector("#img_original");
+const img_preview     = document.querySelector("#img_original");
+const data_upload_msg = document.querySelector("#data_upload_msg");
 
 // The output array will encode colors on two bits: 0x0 for black, 0x1 for white, 0x2 for red
 var output_array = new Uint8ClampedArray((dest_height*dest_width)/4);
@@ -13,6 +14,8 @@ var output_array = new Uint8ClampedArray((dest_height*dest_width)/4);
 function handleFileSelect(evt) {
     var file = document.querySelector("#img_upload").files[0];
     var reader = new FileReader();
+
+    data_upload_msg.innerHTML = "";
 
     reader.onload = function () {
             var img = new Image;
@@ -172,6 +175,16 @@ function handleFileSelect(evt) {
                 // Clear canvas and set its contents to the quantized pixels
                 canvas_context.clearRect(0, 0, canvas.width, canvas.height);
                 canvas_context.putImageData(resulting_img, 0, 0);
+
+                // Send data over POST
+                const req = new XMLHttpRequest();
+                req.open("POST", "/upload", true);
+
+                req.onload = (event) => {
+                    data_upload_msg.innerHTML = "Upload succeeded";
+                };
+
+                req.send(output_array);
             };
 
             img.src = reader.result;

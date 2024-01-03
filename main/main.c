@@ -17,6 +17,8 @@
 #include "esp_http_server.h"
 #include "dns_server.h"
 
+#include "display_manager.h"
+
 #define EXAMPLE_ESP_WIFI_SSID CONFIG_ESP_WIFI_SSID
 #define EXAMPLE_ESP_WIFI_PASS CONFIG_ESP_WIFI_PASSWORD
 #define EXAMPLE_MAX_STA_CONN  CONFIG_ESP_MAX_STA_CONN
@@ -31,6 +33,7 @@ extern const char style_start[] asm("_binary_style_css_start");
 extern const char style_end[] asm("_binary_style_css_end");
 
 static esp_err_t common_get_handler(httpd_req_t *req);
+static esp_err_t buffer_post_handler(httpd_req_t *req);
 static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
 static void wifi_init_softap(void);
 static httpd_handle_t start_webserver(void);
@@ -38,7 +41,15 @@ static httpd_handle_t start_webserver(void);
 static const httpd_uri_t common_get_uri = {
     .uri = "/*",
     .method = HTTP_GET,
-    .handler = common_get_handler
+    .handler = common_get_handler,
+    .user_ctx  = NULL
+};
+
+static const httpd_uri_t buffer_post_uri = {
+    .uri       = "/upload",
+    .method    = HTTP_POST,
+    .handler   = buffer_post_handler,
+    .user_ctx  = NULL
 };
 
 static const char *TAG = "PaperFrame";
@@ -124,6 +135,52 @@ static esp_err_t common_get_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+// HTTP buffer POST upload handler
+static esp_err_t buffer_post_handler(httpd_req_t *req)
+{
+    int ret            = ESP_FAIL;
+    int remaining      = req->content_len;
+    uint32_t idx       = 0;
+    uint8_t* buff      = display_get_framebuffer();
+    uint32_t buff_size = display_get_framebuffer_size();
+
+    if (remaining > buff_size)
+    {
+        return ESP_FAIL;
+    }
+
+    while (remaining > 0) {
+        /* Read the data for the request */
+        if ((ret = httpd_req_recv(req, (char*) buff+idx, MIN(remaining, buff_size))) <= 0) {
+            if (ret == HTTPD_SOCK_ERR_TIMEOUT) {
+                /* Retry receiving if timeout occurred */
+                continue;
+            }
+            return ESP_FAIL;
+        }
+
+        remaining -= ret;
+        idx       += ret;
+
+        /* Log data received */
+        ESP_LOGI(TAG, "Received %d bytes", ret);
+    }
+
+    // End response
+    httpd_resp_send_chunk(req, NULL, 0);
+
+    if(display_save_framebuffer())
+    {
+        ESP_LOGI(TAG, "Received and saved %lu bytes", idx);
+    }
+    else
+    {
+        ESP_LOGI(TAG, "Failed to store framebuffer");
+    }
+
+    return ESP_OK;
+}
+
 static httpd_handle_t start_webserver(void)
 {
     httpd_handle_t server = NULL;
@@ -138,6 +195,7 @@ static httpd_handle_t start_webserver(void)
         // Set URI handlers
         ESP_LOGI(TAG, "Registering URI handlers");
         httpd_register_uri_handler(server, &common_get_uri);
+        httpd_register_uri_handler(server, &buffer_post_uri);
     }
     return server;
 }

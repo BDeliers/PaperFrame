@@ -1,3 +1,5 @@
 **/build
 
 *.old
+
+sdkconfig.defaults

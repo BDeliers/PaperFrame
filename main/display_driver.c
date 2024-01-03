@@ -65,6 +65,9 @@
 static uint8_t*             framebuffer_ptr     = NULL;
 static const char*          TAG                 = "display_driver";
 static bool                 transaction_started = false;
+static bool                 driver_configured   = false;
+
+#define CONFIG_CHECK()      {if (!driver_configured) { return false; }}
 
 // SPI device linked to the display
 static spi_device_handle_t  spi_dev;
@@ -79,6 +82,8 @@ static void display_wait_until_ready(void);
 // Write a command to the display.
 static bool spi_write_command(uint8_t command, bool keep_cs_active)
 {
+    CONFIG_CHECK();
+
     // Get bus ownership
     spi_device_acquire_bus(spi_dev, portMAX_DELAY);
 
@@ -107,6 +112,8 @@ static bool spi_write_command(uint8_t command, bool keep_cs_active)
 // Write data to the display/ Has to be called after spi_write_command
 static bool spi_write_data(uint8_t* data, uint16_t len)
 {
+    CONFIG_CHECK();
+
     if (!transaction_started)
     {
         return false;
@@ -130,6 +137,8 @@ static bool spi_write_data(uint8_t* data, uint16_t len)
 // Read data from the display/ Has to be called after spi_write_command
 static bool spi_read_data(uint8_t* data, uint16_t len)
 {
+    CONFIG_CHECK();
+
     if (!transaction_started)
     {
         return false;
@@ -173,6 +182,8 @@ static void display_wait_until_ready(void)
 // Refresh the display, i.e. show the framebuffer
 bool display_refresh(void)
 {
+    CONFIG_CHECK();
+
     ESP_LOGI(TAG, "display_refresh");
 
     bool ret = spi_write_command(GD7965_REG_DRF, false);
@@ -185,6 +196,8 @@ bool display_refresh(void)
 // Send the display to lowest power consumption
 bool display_low_power_mode(void)
 {
+    CONFIG_CHECK();
+
     ESP_LOGI(TAG, "display_low_power_mode");
 
     // Power-off display
@@ -202,6 +215,8 @@ bool display_low_power_mode(void)
 // Transfer framebuffer to the display
 bool display_transfer(void)
 {
+    CONFIG_CHECK();
+
     ESP_LOGI(TAG, "display_transfer");
 
     // Black data
@@ -224,6 +239,7 @@ bool display_driver_init(uint8_t* framebuffer)
     }
 
     framebuffer_ptr = framebuffer;
+    transaction_started = false;
 
     // Initialize I/O
     // CS, RST and D/C are outputs
@@ -349,5 +365,6 @@ bool display_configure(void)
     // Partial mode disabled (refresh full display)
     spi_write_command(GD7965_REG_PTOUT, false);
 
+    driver_configured = true;
     return true;
 }

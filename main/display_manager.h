@@ -27,7 +27,10 @@ bool     display_manager_restore_framebuffer(void);
 bool     display_manager_init(void);
 
 // Transfer the buffer to the displan then send it to sleep mode
-bool     display_manager_transfer_and_sleep(void);
+bool     display_manager_show(void);
+
+// Put the display to lowest power mode
+bool    display_manager_power_saving(void);
 
 #ifdef __cplusplus
 }

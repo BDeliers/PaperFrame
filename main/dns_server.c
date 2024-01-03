@@ -9,6 +9,7 @@
 
 #include <sys/param.h>
 #include <inttypes.h>
+#include <string.h>
 
 #include "esp_log.h"
 #include "esp_system.h"
@@ -27,7 +28,8 @@
 #define QD_TYPE_A (0x0001)
 #define ANS_TTL_SEC (300)
 
-static const char *TAG = "dns_redirect_server";
+static const char *TAG              = "dns_redirect_server";
+static const char APP_DNS_NAME[]    = "paperframe.io";
 
 // DNS Header Packet
 typedef struct __attribute__((__packed__))
@@ -140,20 +142,24 @@ static int parse_dns_request(char *req, size_t req_len, char *dns_reply, size_t 
 
         ESP_LOGD(TAG, "Received type: %d | Class: %d | Question for: %s", qd_type, qd_class, name);
 
-        if (qd_type == QD_TYPE_A) {
-            dns_answer_t *answer = (dns_answer_t *)cur_ans_ptr;
+        // Redirect only when requesting our fancy domain
+        if (strcmp(name, APP_DNS_NAME) == 0)
+        {
+            if (qd_type == QD_TYPE_A) {
+                dns_answer_t *answer = (dns_answer_t *)cur_ans_ptr;
 
-            answer->ptr_offset = htons(0xC000 | (cur_qd_ptr - dns_reply));
-            answer->type = htons(qd_type);
-            answer->class = htons(qd_class);
-            answer->ttl = htonl(ANS_TTL_SEC);
+                answer->ptr_offset = htons(0xC000 | (cur_qd_ptr - dns_reply));
+                answer->type = htons(qd_type);
+                answer->class = htons(qd_class);
+                answer->ttl = htonl(ANS_TTL_SEC);
 
-            esp_netif_ip_info_t ip_info;
-            esp_netif_get_ip_info(esp_netif_get_handle_from_ifkey("WIFI_AP_DEF"), &ip_info);
-            ESP_LOGD(TAG, "Answer with PTR offset: 0x%" PRIX16 " and IP 0x%" PRIX32, ntohs(answer->ptr_offset), ip_info.ip.addr);
+                esp_netif_ip_info_t ip_info;
+                esp_netif_get_ip_info(esp_netif_get_handle_from_ifkey("WIFI_AP_DEF"), &ip_info);
+                ESP_LOGD(TAG, "Answer with PTR offset: 0x%" PRIX16 " and IP 0x%" PRIX32, ntohs(answer->ptr_offset), ip_info.ip.addr);
 
-            answer->addr_len = htons(sizeof(ip_info.ip.addr));
-            answer->ip_addr = ip_info.ip.addr;
+                answer->addr_len = htons(sizeof(ip_info.ip.addr));
+                answer->ip_addr = ip_info.ip.addr;
+            }
         }
     }
     return reply_len;

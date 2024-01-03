@@ -12,7 +12,10 @@
 #include "nvs_flash.h"
 #include "esp_wifi.h"
 #include "esp_netif.h"
+#include "esp_sleep.h"
 #include "lwip/inet.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 #include "esp_http_server.h"
 #include "dns_server.h"
@@ -40,6 +43,7 @@ static esp_err_t buffer_post_handler(httpd_req_t *req);
 static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
 static void wifi_init_softap(void);
 static httpd_handle_t start_webserver(void);
+static void goto_power_saving(void);
 
 // GET uri for all pages
 static const httpd_uri_t common_get_uri = {
@@ -211,6 +215,28 @@ static httpd_handle_t start_webserver(void)
     return server;
 }
 
+static void goto_power_saving(void)
+{
+    // Display to lowest power consumption
+    display_manager_power_saving();
+
+    // Enable deep sleep for all RTC power domains
+    /*for (uint8_t domain = 0; domain < ESP_PD_DOMAIN_MAX; domain++)
+    {
+        ESP_ERROR_CHECK(esp_sleep_pd_config(domain, ESP_PD_OPTION_OFF));
+    }*/
+
+    ESP_LOGI(TAG, "Going to deep sleep");
+
+    // Power-off wifi
+    ESP_ERROR_CHECK(esp_wifi_stop());
+
+    vTaskDelay(1);
+
+    // Force deep sleep now. No wakeup configured -> wakeup with reset
+    esp_deep_sleep_start();
+}
+
 void app_main(void)
 {
     /*
@@ -249,7 +275,8 @@ void app_main(void)
         ESP_LOGE(TAG, "Failed to initialize display");
     }
 
-    // Start a timer which will send the device to sleep after one minute
+    uint32_t start_time       = xTaskGetTickCount();    // Startup time, used to make a timeout
+    uint32_t timeout_in_ticks = 120*configTICK_RATE_HZ;  // One minute in terms of ticks
 
     ESP_LOGI(TAG, "Starting main loop");
 
@@ -268,15 +295,22 @@ void app_main(void)
                 ESP_LOGW(TAG, "Failed to store framebuffer");
             }
 
-            // Show it on the display then send it to sleep
-            if (!display_manager_transfer_and_sleep())
+            // Show it on the display
+            if (!display_manager_show())
             {
                 ESP_LOGE(TAG, "Failed to set display");
             }
 
             image_received = false;
 
-            // Send the device to sleep too
+            // Send the device and the display
+            goto_power_saving();
+        }
+
+        // Timeout expired
+        if ((xTaskGetTickCount() - start_time) >= timeout_in_ticks)
+        {
+            goto_power_saving();
         }
 
         vTaskDelay(1);

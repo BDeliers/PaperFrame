@@ -118,13 +118,17 @@ bool display_manager_init(void)
     return display_driver_init(framebuffer);
 }
 
-bool display_manager_transfer_and_sleep(void)
+bool display_manager_show(void)
 {
     uint8_t ret = 0;
     ret += display_configure();
     ret += display_transfer();
     ret += display_refresh();
-    ret += display_low_power_mode();
 
-    return ret == 4;
+    return ret == 3;
+}
+
+bool display_manager_power_saving(void)
+{
+    return display_low_power_mode();
 }
